@@ -1,0 +1,15 @@
+{
+  "name": "nanobanna-webapp",
+  "version": "2.0.0",
+  "description": "Nano Banana Pro - Batch Image Recreation",
+  "main": "server.js",
+  "type": "module",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.21.0",
+    "multer": "^1.4.5-lts.1",
+    "dotenv": "^16.4.5"
+  }
+}

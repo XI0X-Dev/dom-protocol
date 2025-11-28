@@ -1,0 +1,409 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>THE DOM PROTOCOL</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="container">
+    <!-- Header -->
+    <header>
+      <h1>THE DOM PROTOCOL <span class="banana">🍌</span></h1>
+    </header>
+
+    <!-- Main Layout -->
+    <div class="layout">
+      <!-- Left Panel - Controls -->
+      <aside class="sidebar">
+        <!-- Face References -->
+        <section class="section">
+          <div class="section-label">FACE REFERENCES</div>
+          
+          <div class="upload-group">
+            <span class="upload-label">PRIMARY REFERENCE</span>
+            <div class="upload-zone" id="faceRef1Zone">
+              <input type="file" id="faceRef1Input" accept="image/*">
+              <div class="upload-placeholder">
+                <div class="upload-text">DROP FILE OR CLICK</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="upload-group">
+            <span class="upload-label">SECONDARY REFERENCE</span>
+            <div class="upload-zone" id="faceRef2Zone">
+              <input type="file" id="faceRef2Input" accept="image/*">
+              <div class="upload-placeholder">
+                <div class="upload-text">OPTIONAL</div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- Settings -->
+        <section class="section">
+          <div class="section-label">PARAMETERS</div>
+          
+          <div class="control-row">
+            <div class="control-group">
+              <label>RATIO</label>
+              <select id="aspectRatio">
+                <option value="1:1">1:1</option>
+                <option value="9:16" selected>9:16</option>
+                <option value="16:9">16:9</option>
+                <option value="3:4">3:4</option>
+                <option value="4:3">4:3</option>
+              </select>
+            </div>
+            <div class="control-group">
+              <label>QUALITY</label>
+              <select id="imageQuality">
+                <option value="1K">1K</option>
+                <option value="2K" selected>2K</option>
+                <option value="4K">4K</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="control-group full">
+            <label>CUSTOM DIRECTIVE</label>
+            <textarea id="customPrompt" placeholder="ENTER CUSTOM INSTRUCTIONS..."></textarea>
+          </div>
+        </section>
+
+        <!-- Generate Button -->
+        <button class="generate-btn" id="generateBtn" disabled>
+          INITIALIZE PROTOCOL <span class="banana">🍌</span>
+        </button>
+
+        <!-- Progress -->
+        <div class="progress-container" id="progressContainer">
+          <div class="progress-bar">
+            <div class="progress-fill" id="progressFill"></div>
+          </div>
+          <div class="status-text" id="statusText"></div>
+        </div>
+      </aside>
+
+      <!-- Main Content -->
+      <main class="main-content">
+        <!-- Target Images -->
+        <section class="section targets-section">
+          <div class="section-header">
+            <div class="section-label">TARGET INPUTS</div>
+            <button class="text-btn" id="clearTargets">CLEAR ALL</button>
+          </div>
+
+          <div class="targets-upload" id="targetsUpload">
+            <input type="file" id="targetsInput" accept="image/*" multiple>
+            <div class="targets-upload-content">
+              <div class="upload-text">DROP TARGET IMAGES HERE</div>
+              <div class="upload-subtext">UP TO 10 FILES</div>
+            </div>
+          </div>
+
+          <div class="targets-grid" id="targetsGrid"></div>
+        </section>
+
+        <!-- Results -->
+        <section class="section results-section" id="resultsPanel">
+          <div class="section-header">
+            <div class="section-label">OUTPUT</div>
+            <button class="text-btn" id="downloadAllBtn">DOWNLOAD ALL</button>
+          </div>
+          <div class="results-grid" id="resultsGrid"></div>
+        </section>
+      </main>
+    </div>
+
+    <!-- Footer -->
+    <footer>
+      <span class="footer-text">CLASSIFIED PROTOCOL v2.0</span>
+    </footer>
+  </div>
+
+  <!-- Modal -->
+  <div class="modal" id="modal">
+    <button class="modal-close" id="modalClose">✕</button>
+    <div class="modal-content">
+      <img id="modalImage" src="">
+    </div>
+  </div>
+
+  <script>
+    // State
+    let faceRef1File = null;
+    let faceRef2File = null;
+    let targetFiles = [];
+    let results = [];
+
+    // Elements
+    const faceRef1Input = document.getElementById('faceRef1Input');
+    const faceRef2Input = document.getElementById('faceRef2Input');
+    const faceRef1Zone = document.getElementById('faceRef1Zone');
+    const faceRef2Zone = document.getElementById('faceRef2Zone');
+    const targetsInput = document.getElementById('targetsInput');
+    const targetsGrid = document.getElementById('targetsGrid');
+    const generateBtn = document.getElementById('generateBtn');
+    const progressContainer = document.getElementById('progressContainer');
+    const progressFill = document.getElementById('progressFill');
+    const statusText = document.getElementById('statusText');
+    const resultsPanel = document.getElementById('resultsPanel');
+    const resultsGrid = document.getElementById('resultsGrid');
+    const modal = document.getElementById('modal');
+    const modalImage = document.getElementById('modalImage');
+
+    // Setup face reference uploads
+    function setupFaceUpload(input, zone, setFile) {
+      input.addEventListener('change', (e) => {
+        const file = e.target.files[0];
+        if (file) {
+          setFile(file);
+          displayPreview(file, zone);
+          updateGenerateButton();
+        }
+      });
+
+      zone.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        zone.classList.add('drag-over');
+      });
+
+      zone.addEventListener('dragleave', () => {
+        zone.classList.remove('drag-over');
+      });
+
+      zone.addEventListener('drop', (e) => {
+        e.preventDefault();
+        zone.classList.remove('drag-over');
+        const file = e.dataTransfer.files[0];
+        if (file && file.type.startsWith('image/')) {
+          setFile(file);
+          displayPreview(file, zone);
+          updateGenerateButton();
+        }
+      });
+    }
+
+    function displayPreview(file, zone) {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        zone.innerHTML = `<input type="file" accept="image/*"><img src="${e.target.result}">`;
+        zone.classList.add('has-image');
+        const newInput = zone.querySelector('input');
+        newInput.addEventListener('change', (ev) => {
+          const newFile = ev.target.files[0];
+          if (newFile) {
+            if (zone === faceRef1Zone) faceRef1File = newFile;
+            else if (zone === faceRef2Zone) faceRef2File = newFile;
+            displayPreview(newFile, zone);
+            updateGenerateButton();
+          }
+        });
+      };
+      reader.readAsDataURL(file);
+    }
+
+    setupFaceUpload(faceRef1Input, faceRef1Zone, (f) => faceRef1File = f);
+    setupFaceUpload(faceRef2Input, faceRef2Zone, (f) => faceRef2File = f);
+
+    // Target images handling
+    targetsInput.addEventListener('change', (e) => {
+      const files = Array.from(e.target.files);
+      addTargetFiles(files);
+    });
+
+    const targetsUpload = document.getElementById('targetsUpload');
+    targetsUpload.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      targetsUpload.classList.add('drag-over');
+    });
+
+    targetsUpload.addEventListener('dragleave', () => {
+      targetsUpload.classList.remove('drag-over');
+    });
+
+    targetsUpload.addEventListener('drop', (e) => {
+      e.preventDefault();
+      targetsUpload.classList.remove('drag-over');
+      const files = Array.from(e.dataTransfer.files).filter(f => f.type.startsWith('image/'));
+      addTargetFiles(files);
+    });
+
+    function addTargetFiles(files) {
+      const remaining = 10 - targetFiles.length;
+      const toAdd = files.slice(0, remaining);
+      targetFiles = [...targetFiles, ...toAdd];
+      renderTargets();
+      updateGenerateButton();
+    }
+
+    function renderTargets() {
+      targetsGrid.innerHTML = targetFiles.map((file, i) => {
+        const url = URL.createObjectURL(file);
+        return `
+          <div class="target-item" data-index="${i}">
+            <img src="${url}">
+            <button class="remove-btn" onclick="removeTarget(${i})">✕</button>
+            <div class="status-badge pending">QUEUED</div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function removeTarget(index) {
+      targetFiles.splice(index, 1);
+      renderTargets();
+      updateGenerateButton();
+    }
+
+    document.getElementById('clearTargets').addEventListener('click', () => {
+      targetFiles = [];
+      renderTargets();
+      updateGenerateButton();
+    });
+
+    function updateGenerateButton() {
+      generateBtn.disabled = !(faceRef1File && targetFiles.length > 0);
+      if (targetFiles.length > 1) {
+        generateBtn.innerHTML = `INITIALIZE PROTOCOL (${targetFiles.length}) <span class="banana">🍌</span>`;
+      } else {
+        generateBtn.innerHTML = `INITIALIZE PROTOCOL <span class="banana">🍌</span>`;
+      }
+    }
+
+    // Generate
+    generateBtn.addEventListener('click', async () => {
+      if (!faceRef1File || targetFiles.length === 0) return;
+
+      generateBtn.disabled = true;
+      progressContainer.classList.add('active');
+      progressFill.style.width = '0%';
+      results = [];
+      resultsGrid.innerHTML = '';
+      resultsPanel.classList.remove('active');
+
+      const formData = new FormData();
+      formData.append('faceRef1', faceRef1File);
+      if (faceRef2File) formData.append('faceRef2', faceRef2File);
+      targetFiles.forEach(f => formData.append('targetImages', f));
+      formData.append('aspectRatio', document.getElementById('aspectRatio').value);
+      formData.append('imageQuality', document.getElementById('imageQuality').value);
+      
+      const customPrompt = document.getElementById('customPrompt').value.trim();
+      if (customPrompt) formData.append('prompt', customPrompt);
+
+      // Update UI to show processing
+      document.querySelectorAll('.target-item .status-badge').forEach(el => {
+        el.className = 'status-badge processing';
+        el.textContent = 'PROCESSING';
+      });
+
+      try {
+        statusText.textContent = 'TRANSMITTING DATA...';
+        progressFill.style.width = '20%';
+        
+        const response = await fetch('/api/generate-batch', {
+          method: 'POST',
+          body: formData
+        });
+
+        progressFill.style.width = '90%';
+        statusText.textContent = 'DECODING RESPONSE...';
+
+        const data = await response.json();
+
+        if (data.error) {
+          statusText.textContent = `ERROR: ${data.error.toUpperCase()}`;
+          return;
+        }
+
+        // Process results
+        results = data.results;
+        
+        data.results.forEach((result, i) => {
+          const statusEl = document.querySelector(`.target-item[data-index="${i}"] .status-badge`);
+          if (result.success) {
+            statusEl.className = 'status-badge success';
+            statusEl.textContent = 'COMPLETE';
+          } else {
+            statusEl.className = 'status-badge error';
+            statusEl.textContent = 'FAILED';
+          }
+        });
+
+        progressFill.style.width = '100%';
+        statusText.textContent = `PROTOCOL COMPLETE: ${data.successful}/${data.total} SUCCESSFUL`;
+
+        // Show results
+        renderResults();
+
+      } catch (error) {
+        statusText.textContent = `SYSTEM ERROR: ${error.message.toUpperCase()}`;
+      } finally {
+        generateBtn.disabled = false;
+      }
+    });
+
+    function renderResults() {
+      const successful = results.filter(r => r.success);
+      if (successful.length === 0) {
+        resultsPanel.classList.remove('active');
+        return;
+      }
+
+      resultsPanel.classList.add('active');
+      resultsGrid.innerHTML = successful.map((result, i) => `
+        <div class="result-item" onclick="showModal(${i})">
+          <img src="data:${result.image.mimeType};base64,${result.image.data}">
+          <button class="download-btn" onclick="event.stopPropagation(); downloadResult(${i})">SAVE</button>
+        </div>
+      `).join('');
+    }
+
+    function showModal(index) {
+      const result = results.filter(r => r.success)[index];
+      modalImage.src = `data:${result.image.mimeType};base64,${result.image.data}`;
+      modal.classList.add('active');
+      document.body.style.overflow = 'hidden';
+    }
+
+    document.getElementById('modalClose').addEventListener('click', () => {
+      modal.classList.remove('active');
+      document.body.style.overflow = '';
+    });
+
+    modal.addEventListener('click', (e) => {
+      if (e.target === modal) {
+        modal.classList.remove('active');
+        document.body.style.overflow = '';
+      }
+    });
+
+    function downloadResult(index) {
+      const result = results.filter(r => r.success)[index];
+      const link = document.createElement('a');
+      link.href = `data:${result.image.mimeType};base64,${result.image.data}`;
+      link.download = `DOM-PROTOCOL-${Date.now()}-${index}.png`;
+      link.click();
+    }
+
+    document.getElementById('downloadAllBtn').addEventListener('click', () => {
+      results.filter(r => r.success).forEach((result, i) => {
+        setTimeout(() => downloadResult(i), i * 200);
+      });
+    });
+
+    // Keyboard shortcuts
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+        modal.classList.remove('active');
+        document.body.style.overflow = '';
+      }
+    });
+  </script>
+</body>
+</html>
