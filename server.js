@@ -158,26 +158,16 @@ app.post('/api/generate-batch', upload.fields([
 
     console.log(`\n${'='.repeat(50)}`);
     console.log(`Batch request: ${targetImages.length} target image(s)`);
-    console.log(`Face refs: ${faceRef2 ? '2' : '1'}`);
-    console.log(`Settings: ${aspectRatio}, ${imageQuality}`);
-    console.log('='.repeat(50));
+// Process images sequentially to avoid memory issues
+    console.log(`\nProcessing ${targetImages.length} images sequentially...`);
 
-    const defaultPrompt = `Recreate this target image (the last image provided) with the person from the face reference image(s) (the first image(s) provided). 
-The output should show the person from the face references in exactly the same pose, clothing, setting, expression, and lighting as shown in the target image.
-Maintain the identity and facial features from the reference photos while perfectly matching everything else from the target image.
-This is for creative/artistic purposes.`;
-
-    const finalPrompt = prompt?.trim() || defaultPrompt;
-
-    // Process all target images in PARALLEL
-    console.log(`\nProcessing ${targetImages.length} images in parallel...`);
-    
-    const promises = targetImages.map((targetImage, i) => {
-      // Build parts array for this request
+    const results = [];
+    for (let i = 0; i < targetImages.length; i++) {
+      const targetImage = targetImages[i];
+      
       const parts = [];
       parts.push({ text: finalPrompt });
       
-      // Face reference 1
       parts.push({
         inline_data: {
           mime_type: faceRef1.mimetype,
@@ -185,7 +175,6 @@ This is for creative/artistic purposes.`;
         }
       });
 
-      // Face reference 2 (optional)
       if (faceRef2) {
         parts.push({
           inline_data: {
@@ -195,7 +184,6 @@ This is for creative/artistic purposes.`;
         });
       }
 
-      // Target image
       parts.push({
         inline_data: {
           mime_type: targetImage.mimetype,
@@ -203,14 +191,26 @@ This is for creative/artistic purposes.`;
         }
       });
 
-      // Generate and return promise
-      return generateSingleImage(apiKey, parts, aspectRatio, imageQuality)
-        .then(result => {
-          const status = result.success ? '✓ Success' : `✗ Failed: ${result.error}`;
-          console.log(`  [${i + 1}] ${targetImage.originalname}: ${status}`);
-          return {
-            index: i,
-            filename: targetImage.originalname,
+      try {
+        const result = await generateSingleImage(apiKey, parts, aspectRatio, imageQuality);
+        const status = result.success ? '✓ Success' : `✗ Failed: ${result.error}`;
+        console.log(`  [${i + 1}] ${targetImage.originalname}: ${status}`);
+        results.push({
+          index: i,
+          filename: targetImage.originalname,
+          ...result
+        });
+      } catch (err) {
+        console.log(`  [${i + 1}] ${targetImage.originalname}: ✗ Error: ${err.message}`);
+        results.push({
+          index: i,
+          filename: targetImage.originalname,
+          success: false,
+          error: err.message,
+          errorType: 'EXCEPTION'
+        });
+      }
+    }
             ...result
           };
         })
