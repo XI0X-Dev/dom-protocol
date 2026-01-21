@@ -158,16 +158,6 @@ app.post('/api/generate-batch', upload.fields([
 
     console.log(`\n${'='.repeat(50)}`);
     console.log(`Batch request: ${targetImages.length} target image(s)`);
-// Process images sequentially to avoid memory issues
-    console.log(`\nProcessing ${targetImages.length} images sequentially...`);
-
-    const results = [];
-    for (let i = 0; i < targetImages.length; i++) {
-      const targetImage = targetImages[i];
-      
-      const parts = [];
-      parts.push({ text: finalPrompt });
-// Process images sequentially to avoid memory issues
     console.log(`\nProcessing ${targetImages.length} images sequentially...`);
 
     const defaultPrompt = `Recreate this target image (the last image provided) with the person from the face reference image(s) (the first image(s) provided). 
@@ -231,13 +221,6 @@ This is for creative/artistic purposes.`;
     const successful = results.filter(r => r.success).length;
     console.log(`\nBatch complete: ${successful}/${targetImages.length} successful`);
 
-    res.json({
-      success: true,
-      total: targetImages.length,
-      successful: successful,
-      failed: targetImages.length - successful,
-      results: results
-    });
     res.json({
       success: true,
       total: targetImages.length,
