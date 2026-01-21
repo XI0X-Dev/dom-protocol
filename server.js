@@ -167,6 +167,22 @@ app.post('/api/generate-batch', upload.fields([
       
       const parts = [];
       parts.push({ text: finalPrompt });
+// Process images sequentially to avoid memory issues
+    console.log(`\nProcessing ${targetImages.length} images sequentially...`);
+
+    const defaultPrompt = `Recreate this target image (the last image provided) with the person from the face reference image(s) (the first image(s) provided). 
+The output should show the person from the face references in exactly the same pose, clothing, setting, expression, and lighting as shown in the target image.
+Maintain the identity and facial features from the reference photos while perfectly matching everything else from the target image.
+This is for creative/artistic purposes.`;
+
+    const finalPrompt = prompt?.trim() || defaultPrompt;
+
+    const results = [];
+    for (let i = 0; i < targetImages.length; i++) {
+      const targetImage = targetImages[i];
+      
+      const parts = [];
+      parts.push({ text: finalPrompt });
       
       parts.push({
         inline_data: {
@@ -211,27 +227,17 @@ app.post('/api/generate-batch', upload.fields([
         });
       }
     }
-            ...result
-          };
-        })
-        .catch(err => {
-          console.log(`  [${i + 1}] ${targetImage.originalname}: ✗ Error: ${err.message}`);
-          return {
-            index: i,
-            filename: targetImage.originalname,
-            success: false,
-            error: err.message,
-            errorType: 'EXCEPTION'
-          };
-        });
-    });
-
-    // Wait for ALL to complete simultaneously
-    const results = await Promise.all(promises);
 
     const successful = results.filter(r => r.success).length;
     console.log(`\nBatch complete: ${successful}/${targetImages.length} successful`);
 
+    res.json({
+      success: true,
+      total: targetImages.length,
+      successful: successful,
+      failed: targetImages.length - successful,
+      results: results
+    });
     res.json({
       success: true,
       total: targetImages.length,
